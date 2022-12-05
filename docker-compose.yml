@@ -1,0 +1,42 @@
+version: '3.3'
+
+services:
+
+  mc:
+    image: itzg/minecraft-server
+    ports:
+      - 25565:25565
+    environment:
+      EULA: "TRUE"
+    restart: unless-stopped
+    volumes:
+      - ./minecraft/data:/data
+
+  backups:
+    image: itzg/mc-backup
+    network_mode: "service:mc"
+    environment:
+      BACKUP_INTERVAL: "20m"
+      BACKUP_NAME: "ryokan"
+      PLAYERS_ONLINE_CHECK_INTERVAL: "2m"
+      PAUSE_IF_NO_PLAYERS: "true"
+      PRUNE_BACKUPS_DAYS: 14
+    restart: unless-stopped
+    volumes:
+      - ./minecraft/data:/data:ro
+      - ./minecraft/backups:/backups
+
+  map:
+    image: httpd:latest
+    networks:
+      - traefik
+    volumes:
+      - ./overviewer/map:/usr/local/apache2/htdocs:ro
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minecraft.rule=Host(`map.minecraft-server.tld`)
+
+networks:
+  traefik:
+    external: true
