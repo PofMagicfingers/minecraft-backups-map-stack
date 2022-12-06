@@ -24,8 +24,17 @@ done
 date
 
 BASE=$(realpath "$(dirname "$(readlink -f "$BASH_SOURCE")")/..")
-
 MINECRAFT_VERSION=$(find $BASE/minecraft/data -name 'minecraft_server*.jar' | sed -E 's#.*server\.(.*)\.jar#\1#')
+
+if [ -f $BASE/.env ]; then
+  echo "[$RAND] loading .env"
+  . $BASE/.env
+fi
+
+if [ -f $BASE/.env.local ]; then
+  echo "[$RAND] loading .env.local"
+  . $BASE/.env.local
+fi
 
 if [ ! -d $BASE/overviewer/map ]; then
  echo "[$RAND] Creating map directory : $BASE/overviewer/map"
@@ -44,6 +53,7 @@ if [ ! -f $BASE/overviewer/config.py ]; then
 fi
 
 echo "[$RAND] Running docker overviewer with RENDER_MAP=${RENDER_MAP:-true} and MINECRAFT_VERSION = ${MINECRAFT_VERSION}"
+
 docker run \
       --rm \
       -e MINECRAFT_VERSION="$MINECRAFT_VERSION" \
@@ -54,5 +64,33 @@ docker run \
       -v $BASE/overviewer/map:/home/minecraft/render/:rw \
       --name "mc_map_generator_$RAND" \
       mide/minecraft-overviewer
+
+cp -vf $BASE/minecraft/data/server-icon.png $BASE/overviewer/map/favicon.png
+
+if [ "${RENDER_MAP:-true}" == "true" ]; then
+  if [ -z "${MC_DISCORD_WH}" ]; then
+    echo "[$RAND] set \$MC_DISCORD_WH to add Discord push notifications"
+  elif [ -z "${MC_MAP_URL}" ]; then
+    echo "[$RAND] set \$MC_MAP_URL to add Discord push notifications"
+  else
+    curl "$MC_DISCORD_WH" \
+    -H "Content-Type: application/json" \
+    -d @- <<PAYLOAD
+  {
+    "username": "${MC_SERVER_NAME:-Minecraft}",
+    "avatar_url": "$MC_MAP_URL/favicon.png",
+    "embeds": [{
+      "title": "✨ Carte mise à jour ",
+      "color": 11027200,
+      "fields": [{
+        "name": "Ouvrir la carte  🗺️",
+        "value": "$MC_MAP_URL",
+        "inline": true
+      }]
+    }]
+  }
+PAYLOAD
+  fi
+fi
 
 echo "[$RAND] Done."
